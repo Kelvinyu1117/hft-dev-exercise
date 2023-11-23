@@ -6,15 +6,22 @@
 
 namespace network {
 
-class TCPClient {
-public:
-  explicit TCPClient(std::string_view endpoint, uint64_t port) {}
 
-  void on_event() {}
+template<typename Traits> class TCPClient
+{
+public:
+  explicit TCPClient() {}
+
+  void connect(std::string_view endpoint, uint16_t port) {}
+
+  void send(const std::byte *const data, size_t cnt){};
+
+
+  void on_event(uint32_t event_mask)
+  {
+    // read from buffer
+  }
 
 private:
-  io::Reactor<io::Epoll> reactor_;
-  char tx_buffer_[1024 * 1024 * 1024];
-  char rx_buffer_[1024 * 1024 * 1024];
 };
-} // namespace network
+}// namespace network

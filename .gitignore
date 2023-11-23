@@ -1,3 +1,10 @@
+# IDE/editors setting
+.vscode
+.cache
+
+# build artifacts
+build/
+
 # Prerequisites
 *.d
 
