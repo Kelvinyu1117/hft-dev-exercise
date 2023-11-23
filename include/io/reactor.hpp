@@ -19,12 +19,15 @@ public:
 
   void stop() noexcept { running_.store(false, std::memory_order_release); }
 
-  int add_event_handler(IEventHandler *handler, uint32_t event_mask) noexcept
+  template<typename T> int add_event_handler(IEventHandler<T> *handler, uint32_t event_mask) noexcept
   {
-    poller_.add_event_handler(handler, event_mask);
+    return poller_.add_event_handler(handler, event_mask);
   }
 
-  int remove_event_handler(IEventHandler *handler) noexcept { poller_.remove_event_handler(handler); }
+  template<typename T> int remove_event_handler(IEventHandler<T> *handler) noexcept
+  {
+    return poller_.remove_event_handler(handler);
+  }
 
 private:
   Poller &poller_;

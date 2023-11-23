@@ -7,21 +7,29 @@
 namespace network {
 
 
-template<typename Traits> class TCPClient
+template<typename T, typename Traits> class TCPClient : public io::IEventHandler<TCPClient<T, Traits>>
 {
+  constexpr static auto RxBufferSize = Traits::RxBufferSize;
+
 public:
   explicit TCPClient() {}
 
-  void connect(std::string_view endpoint, uint16_t port) {}
+  template<typename Reactor> void init(Reactor &reactor) { reactor.add_event_handler(this, EPOLLIN | EPOLLERR); }
 
-  void send(const std::byte *const data, size_t cnt){};
+  void connect(std::string_view endpoint, uint16_t port) noexcept {}
 
+  void send(const std::byte *const data, size_t cnt) noexcept {};
 
-  void on_event(uint32_t event_mask)
+  int fd() noexcept { return -1; }
+
+  void on_event(uint32_t event_mask) noexcept
   {
     // read from buffer
+    // static_cast<T *>(this)->on_tcp_read();
   }
 
 private:
+  std::byte rx_buffer_[RxBufferSize];
+  int fd_;
 };
 }// namespace network

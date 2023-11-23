@@ -3,10 +3,11 @@
 #include <cstdint>
 
 namespace io {
-struct IEventHandler
+
+template<typename T> struct IEventHandler
 {
-  virtual int fd() noexcept = 0;
-  virtual void on_event(uint32_t event_mask) noexcept = 0;
-  virtual ~IEventHandler() {}
+  int fd() noexcept { return static_cast<T *>(this)->fd(); }
+
+  void on_event(uint32_t event_mask) noexcept { return static_cast<T *>(this)->on_event(event_mask); }
 };
 }// namespace io

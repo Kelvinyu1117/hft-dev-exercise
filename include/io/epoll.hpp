@@ -8,28 +8,44 @@
 #include <iostream>
 #include <memory>
 #include <sys/epoll.h>
+#include <sys/types.h>
 #include <system_error>
+#include <vector>
 
 namespace io {
+
+struct EpollEventHandlerContainer
+{
+  using EpollEventHandler = void (*)(uint32_t, void *);
+
+  EpollEventHandler handler{ nullptr };
+  void *user_data{ nullptr };
+};
 
 template<size_t MaxEvents> class Epoll
 {
 public:
   explicit Epoll(std::chrono::microseconds timeout) : timeout_{ timeout }, epoll_fd_(epoll_create1(EPOLL_CLOEXEC))
   {
+    handlers.reserve(MaxEvents * 2);// just avoiding resize()
     if (epoll_fd_ == -1) { throw std::system_error(errno, std::system_category()); }
   }
 
   Epoll(Epoll &&) = default;
 
 
-  int add_event_handler(IEventHandler *handler, uint32_t event_mask) noexcept
+  template<typename T> int add_event_handler(IEventHandler<T> *handler, uint32_t event_mask) noexcept
   {
     epoll_event event;
     memset(std::addressof(event), 0, sizeof(epoll_event));
 
     event.events = event_mask;
-    event.data.ptr = handler;
+    handlers.emplace_back(EpollEventHandlerContainer{
+      [](uint32_t event_masks, void *user_data) { static_cast<IEventHandler<T> *>(user_data)->on_event(event_masks); },
+      handler });
+
+    event.data.ptr = std::addressof(handlers.back());
+
     auto rv = ::epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, handler->fd(), std::addressof(event));
     if (rv == -1) {
       std::cerr << "Epoll - failed to add event_handler for fd " << handler->fd() << " - " << std::strerror(errno)
@@ -40,7 +56,8 @@ public:
     return 0;
   }
 
-  int remove_event_handler(IEventHandler *handler) noexcept
+
+  template<typename T> int remove_event_handler(IEventHandler<T> *handler) noexcept
   {
     auto rv = epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, handler->fd(), nullptr);
     if (rv == -1) {
@@ -64,8 +81,8 @@ public:
         break;
       default:
         for (size_t i = 0; i < evt_cnt; ++i) {
-          auto handler = static_cast<IEventHandler *>(events_[i].data.ptr);
-          handler->on_event(events_[i].events);
+          auto container = static_cast<EpollEventHandlerContainer *>(events_[i].data.ptr);
+          container->handler(events_[i].events, container->user_data);
         }
         break;
     }
@@ -76,6 +93,7 @@ public:
 private:
   std::chrono::microseconds timeout_;
   epoll_event events_[MaxEvents] = {};
+  std::vector<EpollEventHandlerContainer> handlers;
   int epoll_fd_{ -1 };
 };
 }// namespace io
