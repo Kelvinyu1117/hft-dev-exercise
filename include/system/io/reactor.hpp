@@ -1,5 +1,5 @@
 #pragma once
-#include "io/i_event_handler.hpp"
+#include "system/event/i_event_handler.hpp"
 #include <atomic>
 
 namespace io {
@@ -19,12 +19,12 @@ public:
 
   void stop() noexcept { running_.store(false, std::memory_order_release); }
 
-  template<typename T> int add_event_handler(IEventHandler<T> *handler, uint32_t event_mask) noexcept
+  template<typename T> int add_event_handler(event::IEventHandler<T> *handler, uint32_t event_mask) noexcept
   {
     return poller_.add_event_handler(handler, event_mask);
   }
 
-  template<typename T> int remove_event_handler(IEventHandler<T> *handler) noexcept
+  template<typename T> int remove_event_handler(event::IEventHandler<T> *handler) noexcept
   {
     return poller_.remove_event_handler(handler);
   }

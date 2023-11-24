@@ -1,13 +1,14 @@
 #pragma once
 
-#include "io/epoll.hpp"
-#include "io/reactor.hpp"
+#include "system/event/i_event_handler.hpp"
+#include "system/io/epoll.hpp"
+#include "system/io/reactor.hpp"
 #include <string_view>
 
 namespace network {
 
 
-template<typename T, typename Traits> class TCPClient : public io::IEventHandler<TCPClient<T, Traits>>
+template<typename T, typename Traits> class TCPClient : public event::IEventHandler<TCPClient<T, Traits>>
 {
   constexpr static auto RxBufferSize = Traits::RxBufferSize;
 

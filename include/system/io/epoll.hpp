@@ -1,6 +1,6 @@
 #pragma once
 
-#include "io/i_event_handler.hpp"
+#include "system/event/i_event_handler.hpp"
 #include <asm-generic/errno.h>
 #include <cerrno>
 #include <chrono>
@@ -14,7 +14,7 @@
 
 namespace io {
 
-struct EpollEventHandlerContainer
+struct EpollEventData
 {
   using EpollEventHandler = void (*)(uint32_t, void *);
 
@@ -34,14 +34,15 @@ public:
   Epoll(Epoll &&) = default;
 
 
-  template<typename T> int add_event_handler(IEventHandler<T> *handler, uint32_t event_mask) noexcept
+  template<typename T> int add_event_handler(event::IEventHandler<T> *handler, uint32_t event_mask) noexcept
   {
     epoll_event event;
     memset(std::addressof(event), 0, sizeof(epoll_event));
 
     event.events = event_mask;
-    handlers.emplace_back(EpollEventHandlerContainer{
-      [](uint32_t event_masks, void *user_data) { static_cast<IEventHandler<T> *>(user_data)->on_event(event_masks); },
+    handlers.emplace_back(EpollEventData{ [](uint32_t event_masks, void *user_data) {
+                                           static_cast<event::IEventHandler<T> *>(user_data)->on_event(event_masks);
+                                         },
       handler });
 
     event.data.ptr = std::addressof(handlers.back());
@@ -57,7 +58,7 @@ public:
   }
 
 
-  template<typename T> int remove_event_handler(IEventHandler<T> *handler) noexcept
+  template<typename T> int remove_event_handler(event::IEventHandler<T> *handler) noexcept
   {
     auto rv = epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, handler->fd(), nullptr);
     if (rv == -1) {
@@ -81,7 +82,7 @@ public:
         break;
       default:
         for (size_t i = 0; i < evt_cnt; ++i) {
-          auto container = static_cast<EpollEventHandlerContainer *>(events_[i].data.ptr);
+          auto container = static_cast<EpollEventData *>(events_[i].data.ptr);
           container->handler(events_[i].events, container->user_data);
         }
         break;
@@ -93,7 +94,7 @@ public:
 private:
   std::chrono::microseconds timeout_;
   epoll_event events_[MaxEvents] = {};
-  std::vector<EpollEventHandlerContainer> handlers;
+  std::vector<EpollEventData> handlers;
   int epoll_fd_{ -1 };
 };
 }// namespace io

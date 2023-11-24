@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace io {
+namespace event {
 
 template<typename T> struct IEventHandler
 {
@@ -10,4 +10,4 @@ template<typename T> struct IEventHandler
 
   void on_event(uint32_t event_mask) noexcept { return static_cast<T *>(this)->on_event(event_mask); }
 };
-}// namespace io
+}// namespace event
