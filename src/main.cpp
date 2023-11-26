@@ -10,6 +10,21 @@ using Poller = io::Epoll<EPollMaxEvents>;
 using Reactor = io::Reactor<Poller>;
 
 
+struct AppOption
+{
+  std::string endpoint;
+  uint16_t port;
+};
+
+
+AppOption parseOption(int argc, char *argv[])
+{
+  if (argc < 3) { throw "Args: <remote-end-point> <port>\n"; }
+
+  return AppOption{ std::string(argv[1]), static_cast<uint16_t>(atoi(argv[1])) };
+}
+
+
 struct TCPClientTraits
 {
   constexpr static size_t RxBufferSize = 1024 * 1024 * 1024;
@@ -34,6 +49,11 @@ public:
     // send login message
   }
 
+  void logout()
+  {
+    // send logout message
+  }
+
   void submit()
   {
     // send submit message
@@ -48,18 +68,34 @@ public:
   }
 
   void on_tcp_disconnect() {}
+
+  ~Client()
+  {
+    if (!is_logined) { logout(); }
+  }
+
+private:
+  bool is_logined{ false };
 };
 
 
-int main()
+int main(int argc, char *argv[])
 {
+  try {
+    //   auto options = parseOption(argc, argv);
 
-  Poller poller{ std::chrono::seconds(1) };
-  Reactor reactor{ poller };
+    Poller poller{ std::chrono::seconds(1) };
+    Reactor reactor{ poller };
 
-  Client client;
-  client.init(reactor);
-  client.connect("challenge1.vitorian.com", 9009);
+    Client client;
+    client.init(reactor);
+    client.connect("challenge1.vitorian.com", 9009);
+
+
+  } catch (std::exception &ex) {
+    std::cout << "Exception catched: " << ex.what() << '\n';
+  }
+
 
   return 0;
 }
