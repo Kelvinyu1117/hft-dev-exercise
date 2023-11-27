@@ -21,29 +21,51 @@ template<typename T, typename Traits> class TCPClient : public event::IEventHand
 public:
   explicit TCPClient(std::string_view endpoint, uint16_t port) : endpoint_(endpoint), port_(port) {}
 
-  void start() noexcept
+  template<typename Reactor> void start(Reactor &reactor) noexcept
   {
-    fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
-    {
-      sockaddr_in dest;
-      memset(&dest, 0, sizeof(sockaddr_in));
-      dest.sin_family = AF_INET;
-      dest->sin_addr.s_addr = inet_addr(endpoint_.c_str());
-      dest.sin_port = htons(port_);
+    if (!create_socket()) { return; }
+    if (!connect()) { return; }
 
-      if (connect(fd_, (sockaddr *)&dest, sizeof(dest)) < 0) {}
-    }
+    reactor.add_event_handler(this, EPOLLIN | EPOLLET);
   }
+
 
   void send(const std::byte *const data, size_t cnt) noexcept {};
 
   int fd() noexcept { return fd_; }
 
-  void on_event(uint32_t event_mask) noexcept
+  void on_event(uint32_t event_mask) noexcept {}
+
+private:
+  bool create_socket() noexcept
   {
-    // read from buffer
-    // static_cast<T *>(this)->on_tcp_read();
+    fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
+
+    if (fd_ < 0) {
+      std::cerr << "create socket failed, rc = " << fd_ << errno << '\n';
+      return false;
+    }
+
+    return true;
   }
+
+
+  bool connect() noexcept
+  {
+    sockaddr_in dest;
+    memset(&dest, 0, sizeof(sockaddr_in));
+    dest.sin_family = AF_INET;
+    dest.sin_addr.s_addr = inet_addr(endpoint_.c_str());
+    dest.sin_port = htons(port_);
+
+    if (auto rc = connect(fd_, (sockaddr *)&dest, sizeof(dest)); rc < 0) {
+      std::cerr << "connection failed, rc = " << rc << errno << std::endl;
+      return false;
+    }
+
+    return true;
+  }
+
 
 private:
   std::byte rx_buffer_[RxBufferSize];

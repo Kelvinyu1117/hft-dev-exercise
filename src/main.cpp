@@ -35,14 +35,9 @@ class Client : public network::TCPClient<Client, TCPClientTraits>
   using TCPClient = network::TCPClient<Client, TCPClientTraits>;
 
 public:
-  explicit Client() {}
+  explicit Client(std::string_view endpoint, uint16_t port) : TCPClient(endpoint, port) {}
 
-  void init(Reactor &reactor) { TCPClient::init(reactor); }
-
-  void connect(std::string_view endpoint, size_t port)
-  {
-    TCPClient::connect(endpoint, port);// async connect
-  }
+  template<typename Reactor> void start(Reactor &reactor) noexcept { TCPClient::start(reactor); }
 
   void login()
   {
@@ -82,15 +77,13 @@ private:
 int main(int argc, char *argv[])
 {
   try {
-    //   auto options = parseOption(argc, argv);
+    auto options = parseOption(argc, argv);
 
     Poller poller{ std::chrono::seconds(1) };
     Reactor reactor{ poller };
 
-    Client client;
-    client.init(reactor);
-    client.connect("challenge1.vitorian.com", 9009);
-
+    Client client(options.endpoint, options.port);//"challenge1.vitorian.com", 9009
+    client.start(reactor);
 
   } catch (std::exception &ex) {
     std::cout << "Exception catched: " << ex.what() << '\n';
