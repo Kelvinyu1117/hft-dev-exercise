@@ -68,10 +68,10 @@ private:
     addrinfo *addrs;
     std::string port_s = std::to_string(port_);
 
-    hints.ai_family = AF_INET;
+    hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_socktype = IPPROTO_TCP;
 
+    std::cout << "endpoint: " << endpoint_ << " port: " << port_s << '\n';
     if (auto rc = ::getaddrinfo(endpoint_.c_str(), port_s.c_str(), &hints, &addrs); rc != 0) {
       std::cerr << "failed to resolve the Internet name to IP address rc = " << rc << errno << std::endl;
       return false;
@@ -80,8 +80,15 @@ private:
     for (auto it = addrs; it != nullptr; it = it->ai_next) {
       // std::cout << it->ai_family << " " << it->ai_family << " " << it->ai_protocol << '\n';
       char addr_buffer[INET6_ADDRSTRLEN];
-      auto pt = (sockaddr_in *)it->ai_addr;
-      if (inet_ntop(it->ai_family, &pt->sin_addr, addr_buffer, sizeof(addr_buffer))) std::cout << addr_buffer << '\n';
+      if (it->ai_family == AF_INET) {
+        auto pt = (sockaddr_in *)it->ai_addr;
+        if (inet_ntop(it->ai_family, &pt->sin_addr, addr_buffer, sizeof(addr_buffer)))
+          std::cout << "Ipv4: " << addr_buffer << '\n';
+      } else if (it->ai_family == AF_INET6) {
+        auto pt = (sockaddr_in6 *)it->ai_addr;
+        if (inet_ntop(it->ai_family, &pt->sin6_addr, addr_buffer, sizeof(addr_buffer)))
+          std::cout << "Ipv6: " << addr_buffer << '\n';
+      }
     }
 
 

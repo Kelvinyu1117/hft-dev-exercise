@@ -21,7 +21,7 @@ AppOption parseOption(int argc, char *argv[])
 {
   if (argc < 3) { throw "Args: <remote-end-point> <port>\n"; }
 
-  return AppOption{ std::string(argv[1]), static_cast<uint16_t>(atoi(argv[1])) };
+  return AppOption{ std::string(argv[1]), static_cast<uint16_t>(atoi(argv[2])) };
 }
 
 
