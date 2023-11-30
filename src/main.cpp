@@ -27,7 +27,8 @@ AppOption parseOption(int argc, char *argv[])
 
 struct TCPClientTraits
 {
-  constexpr static size_t RxBufferSize = 1024 * 1024 * 1024;
+  constexpr static size_t RxBufferSize = 1024 * 1024;
+  constexpr static size_t TxBufferSize = 1024 * 1024;
 };
 
 class Client : public network::TCPClient<Client, TCPClientTraits>
