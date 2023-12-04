@@ -1,7 +1,10 @@
+#include "protocol/message.hpp"
 #include "system/io/epoll.hpp"
 #include "system/io/reactor.hpp"
 #include "system/network/tcp_client.hpp"
 #include <chrono>
+#include <cstring>
+#include <stdexcept>
 #include <sys/epoll.h>
 
 constexpr static size_t EPollMaxEvents = 64;
@@ -19,7 +22,7 @@ struct AppOption
 
 AppOption parseOption(int argc, char *argv[])
 {
-  if (argc < 3) { throw "Args: <remote-end-point> <port>\n"; }
+  if (argc < 3) { throw std::runtime_error("Wrong Arguments: <remote-end-point> <port>\n"); }
 
   return AppOption{ std::string(argv[1]), static_cast<uint16_t>(atoi(argv[2])) };
 }
@@ -42,7 +45,13 @@ public:
 
   void login()
   {
-    // send login message
+
+    auto msg = protocol::make_message<protocol::LoginRequest>();
+    constexpr std::string_view email = "kelvinyu1117@gmail.com";
+    constexpr std::string_view password = "pwd123";
+
+    memcpy(msg.user, std::data(email), std::size(email));
+    memcpy(msg.password, std::data(password), std::size(password));
   }
 
   void logout()
