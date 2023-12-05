@@ -11,6 +11,7 @@
 #include <string_view>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 namespace network {
 
@@ -62,9 +63,9 @@ public:
 
   void on_tcp_connect() { static_cast<T *>(this)->on_tcp_connect(); }
 
-  void on_tcp_read(const std::byte *const data, size_t n) { static_cast<T *>(this)->on_tcp_read(data, n); }
+  void on_tcp_read(std::byte *const data, size_t n) { static_cast<T *>(this)->on_tcp_read(data, n); }
 
-  void on_tcp_disconnect() {}
+  void disconnect() { ::close(fd_); }
 
 private:
   bool create_socket() noexcept
@@ -125,7 +126,7 @@ private:
   }
 
 
-private:
+protected:
   std::byte rx_buffer_[RxBufferSize];
   std::byte tx_buffer_[TxBufferSize];
   std::string endpoint_;

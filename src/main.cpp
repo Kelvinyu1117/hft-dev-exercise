@@ -3,7 +3,9 @@
 #include "system/io/reactor.hpp"
 #include "system/network/tcp_client.hpp"
 #include <chrono>
+#include <cstdint>
 #include <cstring>
+#include <memory>
 #include <stdexcept>
 #include <sys/epoll.h>
 
@@ -45,13 +47,19 @@ public:
 
   void login()
   {
-
-    auto msg = protocol::make_message<protocol::LoginRequest>();
     constexpr std::string_view email = "kelvinyu1117@gmail.com";
     constexpr std::string_view password = "pwd123";
 
+    auto msg = protocol::make_message<protocol::LoginRequest>();
+    std::fill(tx_buffer_, tx_buffer_ + sizeof(msg), std::byte(0));
+
     memcpy(msg.user, std::data(email), std::size(email));
     memcpy(msg.password, std::data(password), std::size(password));
+    memcpy(tx_buffer_, std::addressof(msg), sizeof(msg));
+
+    auto check_sum = protocol::checksum16(reinterpret_cast<uint8_t *>(tx_buffer_), sizeof(msg));
+    memcpy(tx_buffer_ + sizeof(msg.header) - sizeof(msg.header.checksum), std::addressof(check_sum), sizeof(check_sum));
+    send(tx_buffer_, sizeof(msg));
   }
 
   void logout()
@@ -66,10 +74,48 @@ public:
 
   void on_tcp_connect() { login(); }
 
-
-  void on_tcp_read(const std::byte *const data, size_t cnt)
+  template<typename MessageType> void handle_response(std::byte *const data, protocol::MessageHeader &header)
   {
-    // parse the message
+    auto received_check_sum = header.checksum;
+    header.checksum = 0;
+    memcpy(data, std::addressof(header), sizeof(header));
+    if (received_check_sum != protocol::checksum16(reinterpret_cast<uint8_t *>(tx_buffer_), sizeof(MessageType))) {
+      logout();
+      disconnect();
+    } else {
+      MessageType msg;
+      memcpy(std::addressof(msg), data, sizeof(MessageType));
+
+      if constexpr (std::is_same_v<MessageType, protocol::LoginResponse>) {
+        std::cout << "Login Reponse Received: reason - "
+                  << std::string_view(msg.reason, msg.header.msg_len - sizeof(header));
+      }
+    }
+  }
+
+
+  void on_tcp_read(std::byte *const data, size_t cnt)
+  {
+    while (cnt) {
+      protocol::MessageHeader header;
+      memcpy(std::addressof(header), data, sizeof(header));
+      switch (header.msg_type) {
+        case 'E':
+          std::cout << "E\n";
+          handle_response<protocol::LoginResponse>(data, header);
+          break;
+        case 'R':
+          std::cout << "R\n";
+          handle_response<protocol::SubmissionResponse>(data, header);
+          break;
+        case 'G':
+          std::cout << "G\n";
+          handle_response<protocol::LogoutResponse>(data, header);
+          break;
+        default:
+          std::cout << "Unknown message type: " << header.msg_type << "\n";
+      }
+    }
   }
 
   void on_tcp_disconnect() {}
