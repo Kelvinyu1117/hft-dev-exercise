@@ -78,7 +78,8 @@ template<typename MessageType> inline auto make_message()
     LoginRequest msg;
     memset(&msg, 0, sizeof(msg));
 
-    msg.header.time = std::chrono::steady_clock::now().time_since_epoch().count();
+    msg.header.time =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     msg.header.msg_type = 'L';
     msg.header.msg_len = 109;
 

@@ -34,14 +34,16 @@ struct TCPClientTraits
 {
   constexpr static size_t RxBufferSize = 1024 * 1024;
   constexpr static size_t TxBufferSize = 1024 * 1024;
+  using Reactor = Reactor;
 };
 
 class Client : public network::TCPClient<Client, TCPClientTraits>
 {
   using TCPClient = network::TCPClient<Client, TCPClientTraits>;
+  using Reactor = typename TCPClient::Reactor;
 
 public:
-  explicit Client(std::string_view endpoint, uint16_t port) : TCPClient(endpoint, port) {}
+  explicit Client(Reactor &reactor, std::string_view endpoint, uint16_t port) : TCPClient(reactor, endpoint, port) {}
 
   template<typename Reactor> void start(Reactor &reactor) noexcept { TCPClient::start(reactor); }
 
@@ -51,14 +53,28 @@ public:
     constexpr std::string_view password = "pwd123";
 
     auto msg = protocol::make_message<protocol::LoginRequest>();
+
+    uint8_t buf[sizeof(protocol::LoginRequest)] = {};
+
     std::fill(tx_buffer_, tx_buffer_ + sizeof(msg), std::byte(0));
 
     memcpy(msg.user, std::data(email), std::size(email));
     memcpy(msg.password, std::data(password), std::size(password));
+
+    int offset = sizeof(msg.header) - sizeof(msg.header.checksum);
+    // calculate checksum
+    memcpy(buf, std::addressof(msg.header), offset);
+    memcpy(buf + offset, msg.user, std::size(email));
+    offset += std::size(email) + 1;
+    memcpy(buf + offset + 1, msg.password, std::size(password));
+    offset += std::size(password) + 1;
+
+    msg.header.checksum = protocol::checksum16(reinterpret_cast<uint8_t *>(buf), offset);
+
+    std::cout << "checksum = " << msg.header.checksum << '\n';
     memcpy(tx_buffer_, std::addressof(msg), sizeof(msg));
 
-    auto check_sum = protocol::checksum16(reinterpret_cast<uint8_t *>(tx_buffer_), sizeof(msg));
-    memcpy(tx_buffer_ + sizeof(msg.header) - sizeof(msg.header.checksum), std::addressof(check_sum), sizeof(check_sum));
+    std::cout << "Sending Login Request ...\n";
     send(tx_buffer_, sizeof(msg));
   }
 
@@ -78,43 +94,40 @@ public:
   {
     auto received_check_sum = header.checksum;
     header.checksum = 0;
-    memcpy(data, std::addressof(header), sizeof(header));
-    if (received_check_sum != protocol::checksum16(reinterpret_cast<uint8_t *>(tx_buffer_), sizeof(MessageType))) {
-      logout();
-      disconnect();
-    } else {
-      MessageType msg;
-      memcpy(std::addressof(msg), data, sizeof(MessageType));
+    MessageType msg;
+    memcpy(std::addressof(msg), data, header.msg_len);
 
-      if constexpr (std::is_same_v<MessageType, protocol::LoginResponse>) {
-        std::cout << "Login Reponse Received: reason - "
-                  << std::string_view(msg.reason, msg.header.msg_len - sizeof(header));
-      }
+    if constexpr (std::is_same_v<MessageType, protocol::LoginResponse>) {
+      std::cout << "Login Reponse Received: reason - " << std::string_view(msg.reason) << '\n';
+
+      // if (received_check_sum != protocol::checksum16(reinterpret_cast<uint8_t *>(data), sizeof(MessageType))) {
+      //   logout();
+      // } else {
+      // }
+    } else if constexpr (std::is_same_v<MessageType, protocol::LogoutResponse>) {
+      std::cout << "Logout Reponse Received: reason - " << std::string_view(msg.reason) << '\n';
     }
   }
 
 
   void on_tcp_read(std::byte *const data, size_t cnt)
   {
-    while (cnt) {
-      protocol::MessageHeader header;
-      memcpy(std::addressof(header), data, sizeof(header));
-      switch (header.msg_type) {
-        case 'E':
-          std::cout << "E\n";
-          handle_response<protocol::LoginResponse>(data, header);
-          break;
-        case 'R':
-          std::cout << "R\n";
-          handle_response<protocol::SubmissionResponse>(data, header);
-          break;
-        case 'G':
-          std::cout << "G\n";
-          handle_response<protocol::LogoutResponse>(data, header);
-          break;
-        default:
-          std::cout << "Unknown message type: " << header.msg_type << "\n";
-      }
+    protocol::MessageHeader header;
+    memcpy(std::addressof(header), data, sizeof(header));
+    switch (header.msg_type) {
+      case 'E':
+        handle_response<protocol::LoginResponse>(data, header);
+        break;
+      case 'R':
+        std::cout << "R\n";
+        handle_response<protocol::SubmissionResponse>(data, header);
+        break;
+      case 'G':
+        std::cout << "G\n";
+        handle_response<protocol::LogoutResponse>(data, header);
+        break;
+      default:
+        std::cout << "Unknown message type: " << header.msg_type << "\n";
     }
   }
 
@@ -138,8 +151,9 @@ int main(int argc, char *argv[])
     Poller poller{ std::chrono::seconds(1) };
     Reactor reactor{ poller };
 
-    Client client(options.endpoint, options.port);//"challenge1.vitorian.com", 9009
+    Client client(reactor, options.endpoint, options.port);//"challenge1.vitorian.com", 9009
     client.start(reactor);
+    reactor.run();
 
   } catch (std::exception &ex) {
     std::cout << "Exception catched: " << ex.what() << '\n';

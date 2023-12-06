@@ -1,6 +1,8 @@
 #pragma once
 #include "system/event/i_event_handler.hpp"
 #include <atomic>
+#include <chrono>
+#include <thread>
 
 namespace io {
 template<typename Poller> class Reactor
@@ -10,9 +12,14 @@ public:
 
   bool run() noexcept
   {
+    running_ = true;
+
     if (!running_.load(std::memory_order_acquire)) { return false; }
 
-    while (running_.load(std::memory_order_acquire)) { poller_.poll(); }
+    while (running_.load(std::memory_order_acquire)) {
+      poller_.poll();
+      std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
 
     return true;
   }
