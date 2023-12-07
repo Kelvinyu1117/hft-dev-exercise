@@ -49,8 +49,8 @@ public:
 
   void login()
   {
-    constexpr std::string_view email = "kelvinyu1117@gmail.com";
-    constexpr std::string_view password = "pwd123";
+    constexpr std::string_view email = "kelvinyu1117@gmail.com\0";
+    constexpr std::string_view password = "pwd123\0";
 
     auto msg = protocol::make_message<protocol::LoginRequest>();
 
@@ -61,16 +61,7 @@ public:
     memcpy(msg.user, std::data(email), std::size(email));
     memcpy(msg.password, std::data(password), std::size(password));
 
-    int offset = sizeof(msg.header) - sizeof(msg.header.checksum);
-    // calculate checksum
-    memcpy(buf, std::addressof(msg.header), offset);
-    memcpy(buf + offset, msg.user, std::size(email));
-    offset += std::size(email) + 1;
-    memcpy(buf + offset + 1, msg.password, std::size(password));
-    offset += std::size(password) + 1;
-
-    msg.header.checksum = protocol::checksum16(reinterpret_cast<uint8_t *>(buf), offset);
-
+    msg.header.checksum = protocol::get_check_sum_from_message(msg);
     std::cout << "checksum = " << msg.header.checksum << '\n';
     memcpy(tx_buffer_, std::addressof(msg), sizeof(msg));
 

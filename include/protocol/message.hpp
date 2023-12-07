@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <type_traits>
 namespace protocol {
 using Timestamp = uint64_t;
@@ -89,5 +90,33 @@ template<typename MessageType> inline auto make_message()
   } else {
     static_assert([]() { return false; }(), "Other Message Type is not supported.");
   }
+}
+
+template<typename MessageType> inline uint16_t get_check_sum_from_message(const MessageType &msg)
+{
+  uint8_t buf[sizeof(MessageType)] = {};
+  int offset = sizeof(msg.header) - sizeof(msg.header.checksum);
+  // calculate checksum
+  memcpy(buf, std::addressof(msg.header), offset);
+
+  if constexpr (std::is_same_v<MessageType, LoginRequest>) {
+    auto user_len = std::strlen(msg.user);
+    auto pw_len = std::strlen(msg.password);
+
+    memcpy(buf + offset, msg.user, std::strlen(msg.user));
+    offset += user_len;
+    memcpy(buf + offset, msg.password, pw_len);
+    offset += pw_len;
+
+  } else if constexpr (std::is_same_v<MessageType, LoginResponse>) {
+  } else if constexpr (std::is_same_v<MessageType, SubmissionRequest>) {
+  } else if constexpr (std::is_same_v<MessageType, SubmissionResponse>) {
+  } else if constexpr (std::is_same_v<MessageType, LogoutRequest>) {
+  } else if constexpr (std::is_same_v<MessageType, LogoutResponse>) {
+  } else {
+    static_assert([]() { return false; }());
+  }
+
+  return protocol::checksum16(reinterpret_cast<uint8_t *>(buf), offset);
 }
 }// namespace protocol
