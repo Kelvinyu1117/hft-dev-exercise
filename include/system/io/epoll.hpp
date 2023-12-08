@@ -62,7 +62,7 @@ public:
   {
     auto rv = epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, handler->fd(), nullptr);
     if (rv == -1) {
-      std::cerr << "Epoll - failed to add event_handler for fd " << handler->fd() << " - " << std::strerror(errno)
+      std::cerr << "Epoll - failed to remove event_handler for fd " << handler->fd() << " - " << std::strerror(errno)
                 << '\n';
       return -errno;
     }

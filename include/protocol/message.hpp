@@ -26,7 +26,6 @@ struct LoginRequest
   char password[32];// default: pwd123
 };
 
-
 struct LoginResponse
 {
   MessageHeader header;
@@ -75,21 +74,27 @@ inline uint16_t checksum16(const uint8_t *buf, uint32_t len)
 
 template<typename MessageType> inline auto make_message()
 {
-  if constexpr (std::is_same_v<MessageType, LoginRequest>) {
-    LoginRequest msg;
-    memset(&msg, 0, sizeof(msg));
+  MessageType msg;
+  memset(&msg, 0, sizeof(msg));
+  msg.header.time =
+    std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-    msg.header.time =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+  if constexpr (std::is_same_v<MessageType, LoginRequest>) {
     msg.header.msg_type = 'L';
     msg.header.msg_len = 109;
 
-    return msg;
   } else if constexpr (std::is_same_v<MessageType, SubmissionRequest>) {
+    msg.header.msg_type = 'S';
+    msg.header.msg_len = 205;
 
+  } else if constexpr (std::is_same_v<MessageType, LogoutRequest>) {
+    msg.header.msg_type = 'O';
+    msg.header.msg_len = 13;
   } else {
     static_assert([]() { return false; }(), "Other Message Type is not supported.");
   }
+
+  return msg;
 }
 
 template<typename MessageType> inline uint16_t get_check_sum_from_message(const MessageType &msg)
@@ -103,16 +108,45 @@ template<typename MessageType> inline uint16_t get_check_sum_from_message(const 
     auto user_len = std::strlen(msg.user);
     auto pw_len = std::strlen(msg.password);
 
-    memcpy(buf + offset, msg.user, std::strlen(msg.user));
+    memcpy(buf + offset, msg.user, user_len);
     offset += user_len;
     memcpy(buf + offset, msg.password, pw_len);
     offset += pw_len;
 
   } else if constexpr (std::is_same_v<MessageType, LoginResponse>) {
+    auto reason_len = std::strlen(msg.reason);
+    if (reason_len > 0) reason_len++;
+
+    memcpy(buf + offset, std::addressof(msg.code), sizeof(msg.code));
+    offset += sizeof(msg.code);
+
+    memcpy(buf + offset, msg.reason, reason_len);
+    offset += reason_len;
+
   } else if constexpr (std::is_same_v<MessageType, SubmissionRequest>) {
+    auto name_len = std::strlen(msg.name);
+    auto email_len = std::strlen(msg.email);
+    auto repo_len = std::strlen(msg.repo);
+
+    memcpy(buf + offset, msg.name, name_len);
+    offset += name_len;
+    memcpy(buf + offset, msg.email, email_len);
+    offset += email_len;
+    memcpy(buf + offset, msg.repo, repo_len);
+    offset += repo_len;
+
   } else if constexpr (std::is_same_v<MessageType, SubmissionResponse>) {
+    auto token_len = std::strlen(msg.token) + 1;
+    memcpy(buf + offset, msg.token, token_len);
+    offset += token_len;
+
   } else if constexpr (std::is_same_v<MessageType, LogoutRequest>) {
+    // ...
   } else if constexpr (std::is_same_v<MessageType, LogoutResponse>) {
+    auto reason_len = std::strlen(msg.reason) + 1;
+    memcpy(buf + offset, msg.reason, reason_len);
+    offset += reason_len;
+
   } else {
     static_assert([]() { return false; }());
   }

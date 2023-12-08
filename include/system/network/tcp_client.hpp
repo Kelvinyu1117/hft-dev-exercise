@@ -60,7 +60,6 @@ public:
 
   void on_event(uint32_t event_mask) noexcept
   {
-    std::cout << "mask: " << event_mask << '\n';
     if (event_mask & EPOLLIN) {
       auto n_bytes = ::recv(fd_, rx_buffer_, sizeof(rx_buffer_), 0);
       if (n_bytes > 0)
@@ -75,11 +74,7 @@ public:
 
   void on_tcp_read(std::byte *const data, size_t n) { static_cast<T *>(this)->on_tcp_read(data, n); }
 
-  void disconnect()
-  {
-    reactor_.remove_event_handler(this);
-    ::close(fd_);
-  }
+  void disconnect() { ::close(fd_); }
 
 private:
   bool create_socket() noexcept

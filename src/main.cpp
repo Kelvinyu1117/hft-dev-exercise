@@ -54,15 +54,13 @@ public:
 
     auto msg = protocol::make_message<protocol::LoginRequest>();
 
-    uint8_t buf[sizeof(protocol::LoginRequest)] = {};
-
     std::fill(tx_buffer_, tx_buffer_ + sizeof(msg), std::byte(0));
 
     memcpy(msg.user, std::data(email), std::size(email));
     memcpy(msg.password, std::data(password), std::size(password));
 
     msg.header.checksum = protocol::get_check_sum_from_message(msg);
-    std::cout << "checksum = " << msg.header.checksum << '\n';
+    std::cout << "Login message - checksum = " << msg.header.checksum << '\n';
     memcpy(tx_buffer_, std::addressof(msg), sizeof(msg));
 
     std::cout << "Sending Login Request ...\n";
@@ -72,6 +70,17 @@ public:
   void logout()
   {
     // send logout message
+    auto msg = protocol::make_message<protocol::LogoutRequest>();
+    std::fill(tx_buffer_, tx_buffer_ + sizeof(msg), std::byte(0));
+
+    msg.header.checksum = protocol::get_check_sum_from_message(msg);
+    std::cout << "Logout - checksum = " << msg.header.checksum << '\n';
+    memcpy(tx_buffer_, std::addressof(msg), sizeof(msg));
+
+    memcpy(tx_buffer_, std::addressof(msg), sizeof(msg));
+
+    std::cout << "Sending Logout Request ...\n";
+    send(tx_buffer_, sizeof(msg));
   }
 
   void submit()
@@ -84,19 +93,24 @@ public:
   template<typename MessageType> void handle_response(std::byte *const data, protocol::MessageHeader &header)
   {
     auto received_check_sum = header.checksum;
-    header.checksum = 0;
     MessageType msg;
     memcpy(std::addressof(msg), data, header.msg_len);
+    auto check_sum = protocol::get_check_sum_from_message(msg);
+
+    if (received_check_sum != check_sum) {
+      std::cout << "checksum validation failed, received = " << received_check_sum << ", calculated = " << check_sum
+                << ", drop it now...\n";
+      return;
+    }
 
     if constexpr (std::is_same_v<MessageType, protocol::LoginResponse>) {
-      std::cout << "Login Reponse Received: reason - " << std::string_view(msg.reason) << '\n';
-
-      // if (received_check_sum != protocol::checksum16(reinterpret_cast<uint8_t *>(data), sizeof(MessageType))) {
-      //   logout();
-      // } else {
-      // }
+      std::cout << "Login Response Received: reason - " << std::string_view(msg.reason) << '\n';
     } else if constexpr (std::is_same_v<MessageType, protocol::LogoutResponse>) {
-      std::cout << "Logout Reponse Received: reason - " << std::string_view(msg.reason) << '\n';
+      std::cout << "Logout Response Received: reason - " << std::string_view(msg.reason) << '\n';
+    } else if constexpr (std::is_same_v<MessageType, protocol::SubmissionResponse>) {
+      std::cout << "Submission Response Received: token - " << std::string_view(msg.token) << '\n';
+    } else {
+      static_assert([]() { return false; }());
     }
   }
 
@@ -107,14 +121,15 @@ public:
     memcpy(std::addressof(header), data, sizeof(header));
     switch (header.msg_type) {
       case 'E':
+        std::cout << "Recieved Login response...\n";
         handle_response<protocol::LoginResponse>(data, header);
         break;
       case 'R':
-        std::cout << "R\n";
+        std::cout << "Recieved Submission response...\n";
         handle_response<protocol::SubmissionResponse>(data, header);
         break;
       case 'G':
-        std::cout << "G\n";
+        std::cout << "Recieved Logout response...\n";
         handle_response<protocol::LogoutResponse>(data, header);
         break;
       default:
