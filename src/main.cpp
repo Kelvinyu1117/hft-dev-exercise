@@ -49,12 +49,10 @@ public:
 
   void login()
   {
-    constexpr std::string_view email = "kelvinyu1117@gmail.com\0";
-    constexpr std::string_view password = "pwd123\0";
+    constexpr std::string_view email = "kelvinyu1117@gmail.com";
+    constexpr std::string_view password = "pwd123";
 
     auto msg = protocol::make_message<protocol::LoginRequest>();
-
-    std::fill(tx_buffer_, tx_buffer_ + sizeof(msg), std::byte(0));
 
     memcpy(msg.user, std::data(email), std::size(email));
     memcpy(msg.password, std::data(password), std::size(password));
@@ -71,12 +69,9 @@ public:
   {
     // send logout message
     auto msg = protocol::make_message<protocol::LogoutRequest>();
-    std::fill(tx_buffer_, tx_buffer_ + sizeof(msg), std::byte(0));
 
     msg.header.checksum = protocol::get_check_sum_from_message(msg);
     std::cout << "Logout - checksum = " << msg.header.checksum << '\n';
-    memcpy(tx_buffer_, std::addressof(msg), sizeof(msg));
-
     memcpy(tx_buffer_, std::addressof(msg), sizeof(msg));
 
     std::cout << "Sending Logout Request ...\n";
@@ -86,6 +81,22 @@ public:
   void submit()
   {
     // send submit message
+    constexpr std::string_view name = "Kelvin Wu";
+    constexpr std::string_view email = "kelvinyu1117@gmail.com";
+    constexpr std::string_view repo = "https://github.com/Kelvinyu1117/hft-dev-exercise";
+
+    auto msg = protocol::make_message<protocol::SubmissionRequest>();
+    memcpy(msg.name, std::data(name), std::size(name));
+    memcpy(msg.email, std::data(email), std::size(email));
+    memcpy(msg.repo, std::data(repo), std::size(repo));
+
+    msg.header.checksum = protocol::get_check_sum_from_message(msg);
+    std::cout << "Submission Request message - checksum = " << msg.header.checksum << '\n';
+
+    memcpy(tx_buffer_, std::addressof(msg), sizeof(msg));
+
+    std::cout << "Sending Submission Request ...\n";
+    send(tx_buffer_, sizeof(msg));
   }
 
   void on_tcp_connect() { login(); }
@@ -105,10 +116,15 @@ public:
 
     if constexpr (std::is_same_v<MessageType, protocol::LoginResponse>) {
       std::cout << "Login Response Received: reason - " << std::string_view(msg.reason) << '\n';
+      is_logined_ = true;
+      submit();
     } else if constexpr (std::is_same_v<MessageType, protocol::LogoutResponse>) {
       std::cout << "Logout Response Received: reason - " << std::string_view(msg.reason) << '\n';
+      is_logined_ = false;
     } else if constexpr (std::is_same_v<MessageType, protocol::SubmissionResponse>) {
       std::cout << "Submission Response Received: token - " << std::string_view(msg.token) << '\n';
+      token_ = msg.token;
+      logout();
     } else {
       static_assert([]() { return false; }());
     }
@@ -141,11 +157,15 @@ public:
 
   ~Client()
   {
-    if (!is_logined) { logout(); }
+    if (!is_logined_) {
+      logout();
+      disconnect();
+    }
   }
 
 private:
-  bool is_logined{ false };
+  bool is_logined_{ false };
+  std::string token_;
 };
 
 

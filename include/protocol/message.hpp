@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <memory>
 #include <type_traits>
 namespace protocol {
@@ -78,6 +79,7 @@ template<typename MessageType> inline auto make_message()
   memset(&msg, 0, sizeof(msg));
   msg.header.time =
     std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+  msg.header.time = 1702106441965283638;
 
   if constexpr (std::is_same_v<MessageType, LoginRequest>) {
     msg.header.msg_type = 'L';
@@ -105,8 +107,8 @@ template<typename MessageType> inline uint16_t get_check_sum_from_message(const 
   memcpy(buf, std::addressof(msg.header), offset);
 
   if constexpr (std::is_same_v<MessageType, LoginRequest>) {
-    auto user_len = std::strlen(msg.user);
-    auto pw_len = std::strlen(msg.password);
+    auto user_len = std::size(msg.user);
+    auto pw_len = std::size(msg.password);
 
     memcpy(buf + offset, msg.user, user_len);
     offset += user_len;
@@ -114,8 +116,7 @@ template<typename MessageType> inline uint16_t get_check_sum_from_message(const 
     offset += pw_len;
 
   } else if constexpr (std::is_same_v<MessageType, LoginResponse>) {
-    auto reason_len = std::strlen(msg.reason);
-    if (reason_len > 0) reason_len++;
+    auto reason_len = std::size(msg.reason);
 
     memcpy(buf + offset, std::addressof(msg.code), sizeof(msg.code));
     offset += sizeof(msg.code);
@@ -124,9 +125,9 @@ template<typename MessageType> inline uint16_t get_check_sum_from_message(const 
     offset += reason_len;
 
   } else if constexpr (std::is_same_v<MessageType, SubmissionRequest>) {
-    auto name_len = std::strlen(msg.name);
-    auto email_len = std::strlen(msg.email);
-    auto repo_len = std::strlen(msg.repo);
+    auto name_len = std::size(msg.name);
+    auto email_len = std::size(msg.email);
+    auto repo_len = std::size(msg.repo);
 
     memcpy(buf + offset, msg.name, name_len);
     offset += name_len;
@@ -136,14 +137,15 @@ template<typename MessageType> inline uint16_t get_check_sum_from_message(const 
     offset += repo_len;
 
   } else if constexpr (std::is_same_v<MessageType, SubmissionResponse>) {
-    auto token_len = std::strlen(msg.token) + 1;
+    auto token_len = std::size(msg.token);
+
     memcpy(buf + offset, msg.token, token_len);
     offset += token_len;
 
   } else if constexpr (std::is_same_v<MessageType, LogoutRequest>) {
     // ...
   } else if constexpr (std::is_same_v<MessageType, LogoutResponse>) {
-    auto reason_len = std::strlen(msg.reason) + 1;
+    auto reason_len = std::size(msg.reason);
     memcpy(buf + offset, msg.reason, reason_len);
     offset += reason_len;
 

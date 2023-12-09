@@ -76,6 +76,8 @@ public:
 
   void disconnect() { ::close(fd_); }
 
+  ~TCPClient() { reactor_.remove_event_handler(this); }
+
 private:
   bool create_socket() noexcept
   {
